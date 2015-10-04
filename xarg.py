@@ -3,6 +3,12 @@ import sublime, sublime_plugin, re, os, os.path, mmap
 class XargCommand(sublime_plugin.TextCommand):
 
 
+	def maybe(self, dict, key):
+		if key in dict:
+			return dict[key]
+		else:
+			return None
+
 	def getFields(self, lines):
 		for line in lines:
 			yield line.split(",")
@@ -42,25 +48,26 @@ class XargCommand(sublime_plugin.TextCommand):
 		return view.substr(view.find(pattern, num))
 
 
-	def getData(self):
+	def getData(self, patterns):
+
 
 		data = {}
 
-		data['+metaRegion']     = self.view.find(r"(----)([\n\r])*(.*?[\n\r])*(====)(.+)([\n\r])*", 0)
+		data['+metaRegion']     = self.view.find(patterns['+metaRegion'], 0)
 
-		data['asString']        = self.findMatch(self.view, r"(?<=----)(?<=[\n\r])*(.*?[\n\r])*(?=====)(?=.*?)(?=[\n\r])*", 0)
+		data['asString']        = self.findMatch(self.view, patterns['asString'] , 0)
 
 		data['asLines']         = data['asString'] .splitlines()
 
-		data['asLinesMassaged'] = filter(self.notEmpty, data['asLines'])
+		data['asLinesMassaged'] = list(filter(self.notEmpty, data['asLines']))
 
 		return data
 
 
-	def getSnippet(self):
+	def getSnippet(self, name=None):
 		snippet = {}
 
-		snippet['name']             = self.findMatch(self.view, r"(?<=====)(.+)(?=[\n\r])*", 0)
+		snippet['name']             = name
 
 		snippet['match']            = '<tabTrigger>' + snippet['name']  + '</tabTrigger>'
 
@@ -79,10 +86,20 @@ class XargCommand(sublime_plugin.TextCommand):
 		window = sublime.active_window()
 		info = window.extract_variables()
 
+		patterns = {'+metaRegion': r'(.*[\n\r]*)*', 'asString': r'(.*[\n\r]*)*' }
 
-		data = self.getData()
+		if (self.maybe(info, 'file_extension') != None and self.maybe(info, 'file_extension') != 'csv'):
+			patterns['+metaRegion'] =  r"(----)([\n\r])*(.*?[\n\r])*(====)(.+)([\n\r])*"
+			patterns['asString'] = r"(?<=----)(?<=[\n\r])*(.*?[\n\r])*(?=====)(?=.*?)(?=[\n\r])*" 
 
-		snippet = self.getSnippet()
+		data = self.getData(patterns)
+
+		if (self.maybe(info, 'file_extension') == None or self.maybe(info, 'file_extension') == 'csv'):
+			data['snippetName'] = data['asLinesMassaged'].pop(0)
+		else: data['snippetName'] = self.findMatch(self.view, r"(?<=====)(.+)(?=[\n\r])*", 0)
+
+
+		snippet = self.getSnippet(data['snippetName'])
 
 		self.view.replace(edit, data['+metaRegion'], '')
 
