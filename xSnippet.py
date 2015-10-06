@@ -61,7 +61,7 @@ class xsnippetCommand(sublime_plugin.TextCommand):
 
 		data['asLinesMassaged'] = [re.sub(r'"', '', content) for content in list(filter(self.notEmpty, data['asLines']))]
 
-		data['snippetName']     = data['asLinesMassaged'].pop(0)[8:]
+		data['snippetName']     = data['asLinesMassaged'].pop(0)[5:]
 
 		return data
 
@@ -87,7 +87,7 @@ class xsnippetCommand(sublime_plugin.TextCommand):
 
 	def run(self, edit):
 
-		patterns = {'+metaRegion': r"(snippet:.*[\n\r]*)(.+[\n\r]?)*" }
+		patterns = {'+metaRegion': r"(snip:.*[\n\r]*)(.+[\n\r]?)*" }
 
 		data = self.getData(patterns)
 
