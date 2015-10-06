@@ -1,6 +1,6 @@
 import sublime, sublime_plugin, re, os, os.path, mmap
 
-class xsnippetCommand(sublime_plugin.TextCommand):
+class xsnipCommand(sublime_plugin.TextCommand):
 
 
 	def maybe(self, dict, key):
