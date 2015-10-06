@@ -41,7 +41,7 @@ class xsnipCommand(sublime_plugin.TextCommand):
 		for idx, field in enumerate(content):
 			snippet = re.sub(r'(?<!\\)\${{*{0}:*[a-zA-Z0-9]*}}*'.format(str(idx+1)) ,field, snippet)
 		snippet = re.sub(r'(?<!\\)\$\{\d+:(.+?)\}', '\\1', snippet)
-		snippet = re.sub(r'(?<!\\)\$\d+', '______', snippet)
+		snippet = re.sub(r'(?<!\\)\$\d+', '', snippet)
 		return snippet
 
 
@@ -61,7 +61,7 @@ class xsnipCommand(sublime_plugin.TextCommand):
 
 		data['asLinesMassaged'] = [re.sub(r'"', '', content) for content in list(filter(self.notEmpty, data['asLines']))]
 
-		data['snippetName']     = data['asLinesMassaged'].pop(0)[5:]
+		data['snippetName']     = data['asLinesMassaged'].pop(0)[3:]
 
 		return data
 
@@ -94,8 +94,10 @@ class xsnipCommand(sublime_plugin.TextCommand):
 		snippet = self.getSnippet(data['snippetName'])
 
 		self.view.replace(edit, data['+metaRegion'], '')
-
+		print (snippet)
+		print(data)
 		for snippet in snippet['asStringMassaged']:
+			snips = ''
 			for fields in self.getFields(data['asLinesMassaged']):
-				snip = self.zipSnip(snippet,fields)
-				self.view.insert(edit, data['+metaRegion'].a, snip)
+				snips += self.zipSnip(snippet,fields)
+			self.view.insert(edit, data['+metaRegion'].a, snips)
