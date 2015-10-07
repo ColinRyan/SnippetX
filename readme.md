@@ -1,7 +1,7 @@
 xSnip
 ============
 
-[xSnip](example/example.gif)
+![xSnip](example/example.gif)
 
 ## Installation
 
