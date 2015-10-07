@@ -6,7 +6,7 @@ Like xarg. Substitute rows of data into Snippet placeholders.
 
 ## Installation
 
-Download it useing Package Control.
+Download it using Package Control.
 
 ## Usage
 
