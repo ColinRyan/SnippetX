@@ -1,8 +1,8 @@
-xSnip
+SnippetX
 ============
 
 Like xarg. Substitute rows of data into Snippet placeholders.
-![xSnip](example/example.gif)
+![SnippetX](example/example.gif)
 
 ## Installation
 
