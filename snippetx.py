@@ -1,6 +1,6 @@
 import sublime, sublime_plugin, re, os, os.path, mmap
 
-class xsnipCommand(sublime_plugin.TextCommand):
+class snippetxCommand(sublime_plugin.TextCommand):
 
 
 	def maybe(self, dict, key):
@@ -60,10 +60,10 @@ class xsnipCommand(sublime_plugin.TextCommand):
 		data['asLines']         = data['asString'].splitlines()
 
 		data['asLinesMassaged'] = [re.sub(r'"', '', content) for content in list(filter(self.notEmpty, data['asLines']))]
-		print(data['asLinesMassaged'])
-		if (data['asLinesMassaged'][0][:3] == 'xs:'):
+
+		if (data['asLinesMassaged'][0][:3] == 'sx:'):
 			data['snippetName']     = data['asLinesMassaged'].pop(0)[3:]
-		elif (data['asLinesMassaged'][-1][:3] == 'xs:'):
+		elif (data['asLinesMassaged'][-1][:3] == 'sx:'):
 			data['snippetName']     = data['asLinesMassaged'].pop(-1)[3:]
 		else: data['snippetName'] = ''
 		return data
@@ -80,6 +80,7 @@ class xsnipCommand(sublime_plugin.TextCommand):
 		snippet['filenames']        = list(self.findFiles())
 
 		snippet['matchedFiles']     = [self.matchFile(x, snippet['match']) for x in snippet['filenames']]
+		
 		snippet['filteredFiles']    = list(filter(None.__ne__, snippet['matchedFiles']  ))
 
 		snippet['asString']         = [self.findSnippetContent(x) for x in snippet['filteredFiles']]
@@ -92,10 +93,10 @@ class xsnipCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 
 
-		patterns = {'+metaRegion': r"(xs:.*[\n\r]*)(.+[\n\r]?)*|(?<=[\n\r])(.+[\n\r])+(xs:.+)" }
+		patterns = {'+metaRegion': r"(sx:.*[\n\r]*)(.+[\n\r]?)*|(?<=[\n\r])(.+[\n\r])+(sx:.+)" }
 
 		data = self.getData(patterns)
-		print(data)
+
 		if (data['+metaRegion'].a and data['+metaRegion'].b):
 			snippet = self.getSnippet(data['snippetName'])
 

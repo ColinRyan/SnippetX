@@ -1,6 +1,7 @@
 xSnip
 ============
 
+Like xarg. Substitute rows of data into Snippet placeholders.
 ![xSnip](example/example.gif)
 
 ## Installation

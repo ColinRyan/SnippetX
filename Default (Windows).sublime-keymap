@@ -1,6 +1,6 @@
 [
 { 
 	"keys": ["alt+x"],
-	"command": "xsnip"
+	"command": "snippetx"
 }
 ]
