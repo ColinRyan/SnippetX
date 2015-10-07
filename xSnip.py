@@ -60,9 +60,12 @@ class xsnipCommand(sublime_plugin.TextCommand):
 		data['asLines']         = data['asString'].splitlines()
 
 		data['asLinesMassaged'] = [re.sub(r'"', '', content) for content in list(filter(self.notEmpty, data['asLines']))]
-
-		data['snippetName']     = data['asLinesMassaged'].pop(0)[3:]
-
+		print(data['asLinesMassaged'])
+		if (data['asLinesMassaged'][0][:3] == 'xs:'):
+			data['snippetName']     = data['asLinesMassaged'].pop(0)[3:]
+		elif (data['asLinesMassaged'][-1][:3] == 'xs:'):
+			data['snippetName']     = data['asLinesMassaged'].pop(-1)[3:]
+		else: data['snippetName'] = ''
 		return data
 
 
@@ -77,8 +80,9 @@ class xsnipCommand(sublime_plugin.TextCommand):
 		snippet['filenames']        = list(self.findFiles())
 
 		snippet['matchedFiles']     = [self.matchFile(x, snippet['match']) for x in snippet['filenames']]
+		snippet['filteredFiles']    = list(filter(None.__ne__, snippet['matchedFiles']  ))
 
-		snippet['asString']         = [self.findSnippetContent(x) for x in snippet['matchedFiles']]
+		snippet['asString']         = [self.findSnippetContent(x) for x in snippet['filteredFiles']]
 
 		snippet['asStringMassaged'] = [re.sub(r'\r', '', content) for content in snippet['asString']]
 
@@ -87,17 +91,23 @@ class xsnipCommand(sublime_plugin.TextCommand):
 
 	def run(self, edit):
 
-		patterns = {'+metaRegion': r"(xs:.*[\n\r]*)(.+[\n\r]?)*" }
+
+		patterns = {'+metaRegion': r"(xs:.*[\n\r]*)(.+[\n\r]?)*|(?<=[\n\r])(.+[\n\r])+(xs:.+)" }
 
 		data = self.getData(patterns)
-
-		snippet = self.getSnippet(data['snippetName'])
-
-		self.view.replace(edit, data['+metaRegion'], '')
-		print (snippet)
 		print(data)
-		for snippet in snippet['asStringMassaged']:
-			snips = ''
-			for fields in self.getFields(data['asLinesMassaged']):
-				snips += self.zipSnip(snippet,fields)
-			self.view.insert(edit, data['+metaRegion'].a, snips)
+		if (data['+metaRegion'].a and data['+metaRegion'].b):
+			snippet = self.getSnippet(data['snippetName'])
+
+			if (len(snippet['asStringMassaged'])):
+				self.view.replace(edit, data['+metaRegion'], '')
+
+				for snippet in snippet['asStringMassaged']:
+					snips = ''
+					for fields in self.getFields(data['asLinesMassaged']):
+						snips += self.zipSnip(snippet,fields)
+					self.view.insert(edit, data['+metaRegion'].a, snips)
+			else:
+				sublime.status_message("Can't find snippet named " + snippet['name'])
+		else:
+			sublime.status_message("Can't find region.")
