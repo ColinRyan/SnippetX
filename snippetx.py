@@ -99,7 +99,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
 		patterns = {'+metaRegion': r"([\t ]*sx:.*[\n\r]*)(.+[\n\r]?)*|(?<=[\n\r])?(.+[\n\r])+([\t ]*sx:.+)" }
 
 		data = self.getData(patterns)
-		print(data)
+
 		if (data['+metaRegion'].a >= 0 and data['+metaRegion'].b > 0):
 			snippet = self.getSnippet(data['snippetName'])
 
