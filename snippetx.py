@@ -19,11 +19,11 @@ class snippetxCommand(sublime_plugin.TextCommand):
 			return line
 
 
-	def findFiles(self, path=sublime.packages_path(), type=".sublime-snippet"):
+	def findFiles(self, path, type=".sublime-snippet"):
 		for root, dirs, files in os.walk(path):
-		    for file in files:
-		        if file.endswith(type):
-		             yield os.path.join(root, file)
+			for file in files:
+				if file.endswith(type):
+					yield os.path.join(root, file)
 
 
 	def matchFile(self, path, pattern):
@@ -80,7 +80,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
 		snippet['match']            = '<tabTrigger>' + snippet['name'] + '</tabTrigger>'
 
-		snippet['filenames']        = list(self.findFiles())
+		snippet['filenames']        = list(self.findFiles(sublime.packages_path()))
 
 		snippet['matchedFiles']     = [self.matchFile(x, snippet['match']) for x in snippet['filenames']]
 		
@@ -94,7 +94,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
 
 	def run(self, edit):
-
+		print(sublime.find_resources(r'.*'))
 
 		patterns = {'+metaRegion': r"([\t ]*sx:.*[\n\r]*)(.+[\n\r]?)*|(?<=[\n\r])?(.+[\n\r])+([\t ]*sx:.+)" }
 
