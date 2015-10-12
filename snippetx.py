@@ -39,7 +39,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
 	def zipSnip(self, snippet, content, indent=''):
 		for idx, field in enumerate(content):
-			snippet = re.sub(r'(?<!\\)\${{*{0}:*[a-zA-Z0-9]*}}*'.format(str(idx+1)) ,field, snippet)
+			snippet = re.sub(r'(?<!\\)\${{{0}:.*?}}|\${0}'.format(str(idx+1)) ,field, snippet)
 		snippet = re.sub(r'(?<!\\)\$\{\d+:(.+?)\}', '\\1', snippet)
 		snippet = re.sub(r'(?<!\\)\$\d+', '', snippet)
 		return indent + snippet
@@ -94,7 +94,6 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
 
 	def run(self, edit):
-		print(sublime.find_resources(r'.*'))
 
 		patterns = {'+metaRegion': r"([\t ]*sx:.*[\n\r]*)(.+[\n\r]?)*|(?<=[\n\r])?(.+[\n\r])+([\t ]*sx:.+)" }
 
