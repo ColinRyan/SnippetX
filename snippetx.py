@@ -30,8 +30,13 @@ class snippetxCommand(sublime_plugin.TextCommand):
 		f = open(path)
 		s = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
 		if s.find(pattern.encode('utf-8')) != -1:
-			return s.read(s.size()).decode("utf-8")
+			return path
+		return None
 
+	def readFile(self, path):
+		f = open(path)
+		s = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)		
+		return s.read(s.size()).decode("utf-8")
 
 	def findSnippetContent(self, snippet):
 		return re.search(r'CDATA\[[\n\r]{0,2}(.*?)\]\]', snippet, re.DOTALL).group(1) if snippet else ''
@@ -48,6 +53,13 @@ class snippetxCommand(sublime_plugin.TextCommand):
 	def findMatch(self, view, pattern, num):
 		return view.substr(view.find(pattern, num))
 
+	def getScope(self, snippet):
+		return re.search(r'(?!<!-- )(?<=<scope>)(.+?)(?=</scope>)', snippet).group(0)
+	def removeNegativeScope(self, scope):
+		return re.sub(r'- .*? ', snippet)
+	def checkScope(self, present, allowed):
+		for scope in present:
+			if scope in allowed: return true
 
 	def getData(self, patterns):
 
@@ -72,9 +84,11 @@ class snippetxCommand(sublime_plugin.TextCommand):
 		return data
 
 
-	def getSnippet(self, name=None):
+	def getSnippet(self, name=None, scope='text.plain'):
 
 		snippet = {}
+
+		snippet['scope']            = re.sub(r'[\r\n ]*', '', scope)
 
 		snippet['name']             = name
 
@@ -82,11 +96,20 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
 		snippet['filenames']        = list(self.findFiles(sublime.packages_path()))
 
-		snippet['matchedFiles']     = [self.matchFile(x, snippet['match']) for x in snippet['filenames']]
-		
-		snippet['filteredFiles']    = list(filter(None.__ne__, snippet['matchedFiles']  ))
+		snippet['matchedFilesByTab']     = [self.matchFile(x, snippet['match']) for x in snippet['filenames'] if x != None]
 
-		snippet['asString']         = [self.findSnippetContent(x) for x in snippet['filteredFiles']]
+		snippet['text'] = [self.readFile(x) for x in snippet['matchedFilesByTab'] if x != None]
+
+		if (scope == 'text.plain'):
+			snippet['filteredFilesByScope'] = snippet['matchedFilesByTab']
+		else:
+			snippet['matchedFilesByScope']     = [self.matchFile(x, snippet['scope']) for x in snippet['matchedFilesByTab'] if x != None]
+
+		
+		
+		snippet['filteredText']    = list(filter(None.__ne__, snippet['text']  ))
+
+		snippet['asString']         = [self.findSnippetContent(x) for x in snippet['filteredText']]
 
 		snippet['asStringMassaged'] = [re.sub(r'[\r]', '', content) for content in snippet['asString']]
 
@@ -94,14 +117,18 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
 
 	def run(self, edit):
+		
+
 
 		patterns = {'+metaRegion': r"([\t ]*sx:.*[\n\r]*)(.+[\n\r]?)*|(?<=[\n\r])?(.+[\n\r])+([\t ]*sx:.+)" }
 
 		data = self.getData(patterns)
 
 		if (data['+metaRegion'].a >= 0 and data['+metaRegion'].b > 0):
-			snippet = self.getSnippet(data['snippetName'])
-
+			scope   = self.view.scope_name(data['+metaRegion'].a)
+			print (self.view.scope_name(data['+metaRegion'].a))
+			snippet = self.getSnippet(data['snippetName'], scope)
+			print(snippet)
 			if (len(snippet['asStringMassaged'])):
 				self.view.replace(edit, data['+metaRegion'], '')
 
