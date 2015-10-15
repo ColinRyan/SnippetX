@@ -1,9 +1,11 @@
 <snippet>
 	<content><![CDATA[
-update table ${1:table} set $2 = $3 where $4 = $5
+case $1:
+    ${2:#your code here}
+	break;
 ]]></content>
 	<!-- Optional: Set a tabTrigger to define how to trigger the snippet -->
-	<tabTrigger>update</tabTrigger>
+	<tabTrigger>case2</tabTrigger> 
 	<!-- Optional: Set a scope to limit where the snippet will trigger -->
-	<!-- <scope>source.python</scope> -->
+	<!-- <scope>source.php</scope> -->
 </snippet>

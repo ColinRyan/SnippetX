@@ -1,7 +1,12 @@
 SnippetX
 ============
 
-Like xarg. Substitute rows of data into Snippet placeholders.
+## Turn tabular data into code!
+
+SnippetX takes comma-seperated data (csv) and combines it with a snippet of your choosing. It's like xarg but for snippets.
+
+## Demo
+
 ![SnippetX](example/example.gif)
 
 ## Installation
