@@ -50,16 +50,38 @@ class snippetxCommand(sublime_plugin.TextCommand):
 		return indent + snippet
 
 
-	def findMatch(self, view, pattern, num):
+	def getMatch(self, view, pattern, num):
 		return view.substr(view.find(pattern, num))
 
 	def getScope(self, snippet):
-		return re.search(r'(?!<!-- )(?<=<scope>)(.+?)(?=</scope>)', snippet).group(0)
+		result = re.search(r'(?<!<!-- <scope>)((?<=<scope>).+?)(?=</scope>)', snippet)
+		if result is not None:
+			return result.group(0)
+		return None
+
 	def removeNegativeScope(self, scope):
-		return re.sub(r'- .*? ', snippet)
+		return re.sub(r'- .*? ', '', scope)
+
 	def checkScope(self, present, allowed):
 		for scope in present:
-			if scope in allowed: return true
+			for allow in allowed:
+				if re.match(r'' + scope + r'', allow) is not None: return True
+		return False
+
+
+	def filterByScope(self, snippet, allowed):
+		scope = {}
+		scope['text'] = self.getScope(snippet)
+		print(scope)
+		if (scope['text'] is not None):
+			scope['rmNeg'] = self.removeNegativeScope(scope['text'])
+
+			if (self.checkScope(scope['rmNeg'].split(' '), allowed)):
+				return snippet
+			else:
+				return None
+
+		else: return snippet
 
 	def getData(self, patterns):
 
@@ -67,7 +89,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
 		data['+metaRegion']     = self.view.find(patterns['+metaRegion'], 0)
 
-		data['asString']        = self.findMatch(self.view, patterns['+metaRegion'], 0)
+		data['asString']        = self.getMatch(self.view, patterns['+metaRegion'], 0)
 
 		data['asLines']         = data['asString'].splitlines()
 
@@ -84,32 +106,28 @@ class snippetxCommand(sublime_plugin.TextCommand):
 		return data
 
 
-	def getSnippet(self, name=None, scope='text.plain'):
+	def getSnippet(self, name=None, scope=['text.plain']):
 
 		snippet = {}
 
-		snippet['scope']            = re.sub(r'[\r\n ]*', '', scope)
+		snippet['scope']             = [re.sub(r'[\r\n ]*', '', x) for x in scope if x is not '']
 
-		snippet['name']             = name
+		snippet['name']              = name
 
-		snippet['match']            = '<tabTrigger>' + snippet['name'] + '</tabTrigger>'
+		snippet['match']             = '<tabTrigger>' + snippet['name'] + '</tabTrigger>'
 
-		snippet['filenames']        = list(self.findFiles(sublime.packages_path()))
+		snippet['filenames']         = list(self.findFiles(sublime.packages_path()))
 
-		snippet['matchedFilesByTab']     = [self.matchFile(x, snippet['match']) for x in snippet['filenames'] if x != None]
+		snippet['matchedFilesByTab'] = [self.matchFile(x, snippet['match']) for x in snippet['filenames'] if x is not None]
 
-		snippet['text'] = [self.readFile(x) for x in snippet['matchedFilesByTab'] if x != None]
+		snippet['text']              = [self.readFile(x) for x in snippet['matchedFilesByTab'] if x is not None]
 
-		if (scope == 'text.plain'):
-			snippet['filteredFilesByScope'] = snippet['matchedFilesByTab']
-		else:
-			snippet['matchedFilesByScope']     = [self.matchFile(x, snippet['scope']) for x in snippet['matchedFilesByTab'] if x != None]
+		snippet['filteredText']      = list(filter(None.__ne__, snippet['text']  ))		
 
-		
-		
-		snippet['filteredText']    = list(filter(None.__ne__, snippet['text']  ))
+		snippet['filteredFilesByScope'] = [self.filterByScope(x, scope) for x in snippet['filteredText'] if x is not None]		
 
-		snippet['asString']         = [self.findSnippetContent(x) for x in snippet['filteredText']]
+
+		snippet['asString']         = [self.findSnippetContent(x) for x in snippet['filteredFilesByScope'] if x is not None]
 
 		snippet['asStringMassaged'] = [re.sub(r'[\r]', '', content) for content in snippet['asString']]
 
@@ -117,16 +135,14 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
 
 	def run(self, edit):
-		
-
 
 		patterns = {'+metaRegion': r"([\t ]*sx:.*[\n\r]*)(.+[\n\r]?)*|(?<=[\n\r])?(.+[\n\r])+([\t ]*sx:.+)" }
 
 		data = self.getData(patterns)
 
 		if (data['+metaRegion'].a >= 0 and data['+metaRegion'].b > 0):
-			scope   = self.view.scope_name(data['+metaRegion'].a)
-			print (self.view.scope_name(data['+metaRegion'].a))
+			scope   = self.view.scope_name(data['+metaRegion'].a).split(' ')
+			print (self.view.scope_name(data['+metaRegion'].a).split(' '))
 			snippet = self.getSnippet(data['snippetName'], scope)
 			print(snippet)
 			if (len(snippet['asStringMassaged'])):
