@@ -1,4 +1,10 @@
-import sublime, sublime_plugin, re, os, os.path, mmap
+import mmap
+import os
+import os.path
+import pprint
+import re
+import sublime
+import sublime_plugin
 import xml.etree.ElementTree as ET
 
 
@@ -74,7 +80,8 @@ class snippetxCommand(sublime_plugin.TextCommand):
     def filterByScope(self, snippet, allowed):
         scope = {}
         scope['text'] = self.getScope(snippet)
-        print(scope)
+        print("scope:", end=' ')
+        pprint.pprint(scope)
         if scope.get('text'):
             scope['rmNeg'] = self.removeNegativeScope(scope['text'])
 
@@ -144,9 +151,11 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
         if (data['+metaRegion'].a >= 0 and data['+metaRegion'].b > 0):
             scope   = self.view.scope_name(data['+metaRegion'].a).split(' ')
-            print(self.view.scope_name(data['+metaRegion'].a).split(' '))
+            print("self.view.scope_name(data['+metaRegion'].a).split(' '):", end=' ')
+            pprint.pprint(self.view.scope_name(data['+metaRegion'].a).split(' '))
             snippet = self.getSnippet(data['snippetName'], scope)
-            print(snippet)
+            print("snippet:", end=' ')
+            pprint.pprint(snippet)
             if (len(snippet['asStringMassaged'])):
                 self.view.replace(edit, data['+metaRegion'], '')
 
