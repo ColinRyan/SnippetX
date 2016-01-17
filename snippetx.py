@@ -19,7 +19,23 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
     def getFields(self, lines):
         for line in lines:
-            yield line.split(",")
+            # result_line = line.split(",")  # origin code
+
+            # for escape comma feature START
+            result_line = []
+            while True:
+                r = re.search(r'[^\\](,)', line)
+                if r:
+                    field = line[:r.end()-1]
+                    field = field.replace('\\,', ',')
+                    result_line.append(field)
+                    line = line[r.end():]
+                else:
+                    result_line.append(line.replace('\\,', ','))
+                    break
+            # for escape comma feature END
+
+            yield result_line
 
 
     def notEmpty(self, line):
