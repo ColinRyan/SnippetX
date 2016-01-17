@@ -1,4 +1,6 @@
 import sublime, sublime_plugin, re, os, os.path, mmap
+import xml.etree.ElementTree as ET
+
 
 class snippetxCommand(sublime_plugin.TextCommand):
 
@@ -54,10 +56,10 @@ class snippetxCommand(sublime_plugin.TextCommand):
 		return view.substr(view.find(pattern, num))
 
 	def getScope(self, snippet):
-		result = re.search(r'(?<!<!-- <scope>)((?<=<scope>).+?)(?=</scope>)', snippet)
-		if result is not None:
-			return result.group(0)
-		return None
+		snippet_xml_root_node = ET.fromstring(snippet)
+		scope = snippet_xml_root_node.find('scope')
+		if scope:
+			return scope.text
 
 	def removeNegativeScope(self, scope):
 		return re.sub(r'- .*? ', '', scope)
