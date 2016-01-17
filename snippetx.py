@@ -17,7 +17,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
 
     def notEmpty(self, line):
-        if line not in ['\n', '\r\n', '']:
+        if line.strip():
             return line
 
 
@@ -75,7 +75,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
         scope = {}
         scope['text'] = self.getScope(snippet)
         print(scope)
-        if (scope['text'] is not None):
+        if scope.get('text'):
             scope['rmNeg'] = self.removeNegativeScope(scope['text'])
 
             if (self.checkScope(scope['rmNeg'].split(' '), allowed)):
@@ -112,7 +112,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
         snippet = {}
 
-        snippet['scope']             = [re.sub(r'[\r\n ]*', '', x) for x in scope if x is not '']
+        snippet['scope']             = [re.sub(r'[\r\n ]*', '', x) for x in scope if x]
 
         snippet['name']              = name
 
@@ -120,16 +120,16 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
         snippet['filenames']         = list(self.findFiles(sublime.packages_path()))
 
-        snippet['matchedFilesByTab'] = [self.matchFile(x, snippet['match']) for x in snippet['filenames'] if x is not None]
+        snippet['matchedFilesByTab'] = [self.matchFile(x, snippet['match']) for x in snippet['filenames'] if x]
 
-        snippet['text']              = [self.readFile(x) for x in snippet['matchedFilesByTab'] if x is not None]
+        snippet['text']              = [self.readFile(x) for x in snippet['matchedFilesByTab'] if x]
 
         snippet['filteredText']      = list(filter(None.__ne__, snippet['text']  ))     
 
-        snippet['filteredFilesByScope'] = [self.filterByScope(x, scope) for x in snippet['filteredText'] if x is not None]      
+        snippet['filteredFilesByScope'] = [self.filterByScope(x, scope) for x in snippet['filteredText'] if x]      
 
 
-        snippet['asString']         = [self.findSnippetContent(x) for x in snippet['filteredFilesByScope'] if x is not None]
+        snippet['asString']         = [self.findSnippetContent(x) for x in snippet['filteredFilesByScope'] if x]
 
         snippet['asStringMassaged'] = [re.sub(r'[\r]', '', content) for content in snippet['asString']]
 
@@ -144,7 +144,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
         if (data['+metaRegion'].a >= 0 and data['+metaRegion'].b > 0):
             scope   = self.view.scope_name(data['+metaRegion'].a).split(' ')
-            print (self.view.scope_name(data['+metaRegion'].a).split(' '))
+            print(self.view.scope_name(data['+metaRegion'].a).split(' '))
             snippet = self.getSnippet(data['snippetName'], scope)
             print(snippet)
             if (len(snippet['asStringMassaged'])):
