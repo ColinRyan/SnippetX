@@ -10,13 +10,6 @@ import xml.etree.ElementTree as ET
 
 class snippetxCommand(sublime_plugin.TextCommand):
 
-
-    def maybe(self, dict, key):
-        if key in dict:
-            return dict[key]
-        else:
-            return None
-
     def getFields(self, lines):
         for line in lines:
             # result_line = line.split(",")  # origin code
@@ -37,18 +30,11 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
             yield result_line
 
-
-    def notEmpty(self, line):
-        if line.strip():
-            return line
-
-
     def findFiles(self, path, type=".sublime-snippet"):
         for root, dirs, files in os.walk(path):
             for file in files:
                 if file.endswith(type):
                     yield os.path.join(root, file)
-
 
     def matchFile(self, path, pattern):
         f = open(path)
@@ -65,14 +51,12 @@ class snippetxCommand(sublime_plugin.TextCommand):
     def findSnippetContent(self, snippet):
         return re.search(r'CDATA\[[\n\r]{0,2}(.*?)\]\]', snippet, re.DOTALL).group(1) if snippet else ''
 
-
     def zipSnip(self, snippet, content, indent=''):
         for idx, field in enumerate(content):
             snippet = re.sub(r'(?<!\\)\${{{0}:.*?}}|\${0}'.format(str(idx+1)) ,field, snippet)
         snippet = re.sub(r'(?<!\\)\$\{\d+:(.+?)\}', '\\1', snippet)
         snippet = re.sub(r'(?<!\\)\$\d+', '', snippet)
         return indent + snippet
-
 
     def getMatch(self, view, pattern, num):
         return view.substr(view.find(pattern, num))
@@ -89,24 +73,28 @@ class snippetxCommand(sublime_plugin.TextCommand):
     def checkScope(self, present, allowed):
         for scope in present:
             for allow in allowed:
-                if re.match(r'' + scope + r'', allow) is not None: return True
+                if re.match(r'' + scope + r'', allow):
+                    return True
         return False
 
-
     def filterByScope(self, snippet, allowed):
-        scope = {}
-        scope['text'] = self.getScope(snippet)
-        print("scope:", end=' ')
+        scope = {
+            'text': self.getScope(snippet),
+        }
+
+        print('scope:', end=' ')
         pprint.pprint(scope)
-        if scope.get('text'):
+
+        if scope['text']:
             scope['rmNeg'] = self.removeNegativeScope(scope['text'])
 
-            if (self.checkScope(scope['rmNeg'].split(' '), allowed)):
+            if self.checkScope(scope['rmNeg'].split(' '), allowed):
                 return snippet
             else:
                 return None
 
-        else: return snippet
+        else:
+            return snippet
 
     def getData(self, patterns):
 
@@ -126,10 +114,12 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
         data['indent']          = re.search(r'[\t ]*', data['asLines'][0]).group(0)
 
-        data['asLinesMassaged'] = [re.sub(r'(^[\t ]*|["]*)*', '', content) for content in list(filter(self.notEmpty, data['asLines']))]
+        data['asLinesMassaged'] = [
+            re.sub(r'(^[\t ]*|["]*)*', '', content)
+            for content in data['asLines'] if content.strip()
+        ]
 
         return data
-
 
     def getSnippet(self, name=None, scope=['text.plain']):
 
@@ -157,7 +147,6 @@ class snippetxCommand(sublime_plugin.TextCommand):
         snippet['asStringMassaged'] = [re.sub(r'[\r]', '', content) for content in snippet['asString']]
 
         return snippet
-
 
     def run(self, edit):
 
