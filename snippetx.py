@@ -31,17 +31,24 @@ class snippetxCommand(sublime_plugin.TextCommand):
             yield result_line
 
     def findFiles(self, path, type=".sublime-snippet"):
+
+        all_snippet_path = getattr(self, 'all_snippet_path', [])
+        if all_snippet_path:
+            return all_snippet_path
+
         for root, dirs, files in os.walk(path):
             for file in files:
                 if file.endswith(type):
-                    yield os.path.join(root, file)
+                    # yield os.path.join(root, file)
+                    all_snippet_path.append(os.path.join(root, file))
+        setattr(self, 'all_snippet_path', all_snippet_path)
+        return all_snippet_path
 
-    def matchFile(self, path, pattern):
-        f = open(path)
-        s = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-        if s.find(pattern.encode('utf-8')) != -1:
-            return path
-        return None
+    def xmlMatchTabTrigger(self, paths, trigger_name):
+        for path in paths:
+            xml_root = ET.parse(path)
+            if xml_root.find('tabTrigger').text == trigger_name:
+                yield xml_root
 
     def readFile(self, path):
         f = open(path)
@@ -49,7 +56,8 @@ class snippetxCommand(sublime_plugin.TextCommand):
         return s.read(s.size()).decode("utf-8")
 
     def findSnippetContent(self, snippet):
-        return re.search(r'CDATA\[[\n\r]{0,2}(.*?)\]\]', snippet, re.DOTALL).group(1) if snippet else ''
+        return ET.fromstring(snippet).find('content').text
+        # return re.search(r'CDATA\[[\n\r]{0,2}(.*?)\]\]', snippet, re.DOTALL).group(1) if snippet else ''
 
     def zipSnip(self, snippet, content, indent=''):
         for idx, field in enumerate(content):
@@ -61,40 +69,18 @@ class snippetxCommand(sublime_plugin.TextCommand):
     def getMatch(self, view, pattern, num):
         return view.substr(view.find(pattern, num))
 
-    def getScope(self, snippet):
-        snippet_xml_root_node = ET.fromstring(snippet)
-        scope = snippet_xml_root_node.find('scope')
-        if scope:
-            return scope.text
-
-    def removeNegativeScope(self, scope):
-        return re.sub(r'- .*? ', '', scope)
-
     def checkScope(self, present, allowed):
         for scope in present:
             for allow in allowed:
-                if re.match(r'' + scope + r'', allow):
+                if re.match(scope, allow):
                     return True
         return False
 
-    def filterByScope(self, snippet, allowed):
-        scope = {
-            'text': self.getScope(snippet),
-        }
+    def filterByScope(self, snippet_xml, allowed):
+        scope_text = snippet_xml.find('scope').text
+        scope_rmNeg = re.sub(r'- .*? ', '', scope_text)
+        return self.checkScope(scope_rmNeg.split(', '), allowed)
 
-        print('scope:', end=' ')
-        pprint.pprint(scope)
-
-        if scope['text']:
-            scope['rmNeg'] = self.removeNegativeScope(scope['text'])
-
-            if self.checkScope(scope['rmNeg'].split(' '), allowed):
-                return snippet
-            else:
-                return None
-
-        else:
-            return snippet
 
     def getData(self, patterns):
 
@@ -122,31 +108,16 @@ class snippetxCommand(sublime_plugin.TextCommand):
         return data
 
     def getSnippet(self, name=None, scope=['text.plain']):
+        
+        filenames = self.findFiles(sublime.packages_path())
+        snippet_xmls = self.xmlMatchTabTrigger(filenames, name)
+        snippet_contents = [
+            x.find('content').text
+            for x in snippet_xmls
+            if self.filterByScope(x, scope)
+        ]
 
-        snippet = {}
-
-        snippet['scope']             = [re.sub(r'[\r\n ]*', '', x) for x in scope if x]
-
-        snippet['name']              = name
-
-        snippet['match']             = '<tabTrigger>' + snippet['name'] + '</tabTrigger>'
-
-        snippet['filenames']         = list(self.findFiles(sublime.packages_path()))
-
-        snippet['matchedFilesByTab'] = [self.matchFile(x, snippet['match']) for x in snippet['filenames'] if x]
-
-        snippet['text']              = [self.readFile(x) for x in snippet['matchedFilesByTab'] if x]
-
-        snippet['filteredText']      = list(filter(None.__ne__, snippet['text']  ))     
-
-        snippet['filteredFilesByScope'] = [self.filterByScope(x, scope) for x in snippet['filteredText'] if x]      
-
-
-        snippet['asString']         = [self.findSnippetContent(x) for x in snippet['filteredFilesByScope'] if x]
-
-        snippet['asStringMassaged'] = [re.sub(r'[\r]', '', content) for content in snippet['asString']]
-
-        return snippet
+        return snippet_contents
 
     def run(self, edit):
 
@@ -156,20 +127,19 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
         if (data['+metaRegion'].a >= 0 and data['+metaRegion'].b > 0):
             scope   = self.view.scope_name(data['+metaRegion'].a).split(' ')
-            print("self.view.scope_name(data['+metaRegion'].a).split(' '):", end=' ')
-            pprint.pprint(self.view.scope_name(data['+metaRegion'].a).split(' '))
-            snippet = self.getSnippet(data['snippetName'], scope)
-            print("snippet:", end=' ')
-            pprint.pprint(snippet)
-            if (len(snippet['asStringMassaged'])):
+
+            snippets = self.getSnippet(data['snippetName'], scope)
+
+            if snippets:
                 self.view.replace(edit, data['+metaRegion'], '')
 
-                for snippet in snippet['asStringMassaged']:
+                for snippet in snippets:
                     snips = ''
                     for fields in self.getFields(data['asLinesMassaged']):
                         snips += self.zipSnip(snippet,fields, data['indent'])
                     self.view.insert(edit, data['+metaRegion'].a, snips)
             else:
-                sublime.status_message("Can't find snippet named " + snippet['name'])
+                sublime.status_message("Can't find snippet trigger by %s" % data['snippetName'])
+
         else:
             sublime.status_message("Can't find region.")
