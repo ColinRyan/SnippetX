@@ -71,25 +71,20 @@ class snippetxCommand(sublime_plugin.TextCommand):
         return self.checkScope(scope_rmNeg.split(', '), allowed)
 
     def getData(self, patterns):
-
-        data = {}
-        data['+metaRegion']     = self.view.find(patterns, 0)
         csv_lines = self.getMatch(self.view, patterns, 0).splitlines()
-        print("self.view: %s" % self.view)
-
-        data['snippetName'] = ''
         for i in [0, -1]:
             if 'sx:' in csv_lines[i]:
-                data['snippetName'] = csv_lines.pop(i).split('sx:')[-1]
+                snippet_name = csv_lines.pop(i).split('sx:')[-1]
 
-        data['indent']          = re.findall(r'^[\t\s]*', csv_lines[0])[0]
-
-        data['asLinesMassaged'] = [
-            re.sub(r'(^[\t\s]*|["]*)*', '', content)
-            for content in csv_lines if content.strip()
-        ]
-
-        return data
+        return {
+            '+metaRegion': self.view.find(patterns, 0),
+            'snippetName': snippet_name if snippet_name else '',
+            'indent': re.findall(r'^[\t\s]*', csv_lines[0])[0],
+            'asLinesMassaged': [
+                re.sub(r'(^[\t\s]*|["]*)*', '', content)
+                for content in csv_lines if content.strip()
+            ],
+        }
 
     def getSnippet(self, name=None, scope=['text.plain']):
         
@@ -120,7 +115,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
                 for snippet in snippets:
                     snips = ''
                     for fields in self.getFields(data['asLinesMassaged']):
-                        snips += self.zipSnip(snippet,fields, data['indent'])
+                        snips += self.zipSnip(snippet, fields, data['indent'])
                     self.view.insert(edit, data['+metaRegion'].a, snips)
             else:
                 sublime.status_message("Can't find snippet trigger by %s" % data['snippetName'])
