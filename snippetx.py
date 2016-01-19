@@ -9,8 +9,6 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
     def getFields(self, lines):
         for line in lines:
-            # result_line = line.split(",")  # origin code
-
             # for escape comma feature START
             result_line = []
             while True:
@@ -24,7 +22,6 @@ class snippetxCommand(sublime_plugin.TextCommand):
                     result_line.append(line.replace('\\,', ','))
                     break
             # for escape comma feature END
-
             yield result_line
 
     def findFiles(self, path, type=".sublime-snippet"):
@@ -48,15 +45,16 @@ class snippetxCommand(sublime_plugin.TextCommand):
             if xml_root.find('tabTrigger').text == trigger_name:
                 yield xml_root
 
-    def zipSnip(self, snippet, content, indent=''):
-        for idx, field in enumerate(content):
-            snippet = re.sub(r'(?<!\\)\${{{0}:.*?}}|\${0}'.format(str(idx+1)) ,field, snippet)
+    def zipSnip(self, snippet, fields, indent=''):
+        snippet = snippet.strip()
+        for idx, field in enumerate(fields):
+            snippet = re.sub(r'(?<!\\)\${{{0}:.*?}}|\${0}'.format(str(idx+1)), field, snippet)
         snippet = re.sub(r'(?<!\\)\$\{\d+:(.+?)\}', '\\1', snippet)
         snippet = re.sub(r'(?<!\\)\$\d+', '', snippet)
         return indent + snippet
 
-    def getMatch(self, view, pattern, num):
-        return view.substr(view.find(pattern, num))
+    def getMatch(self, pattern, num):
+        return self.view.substr(self.view.find(pattern, num))
 
     def checkScope(self, present, allowed):
         for scope in present:
@@ -71,7 +69,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
         return self.checkScope(scope_rmNeg.split(', '), allowed)
 
     def getData(self, patterns):
-        csv_lines = self.getMatch(self.view, patterns, 0).splitlines()
+        csv_lines = self.getMatch(patterns, 0).splitlines()
         snippet_name = ''
         for i in [0, -1]:
             if 'sx:' in csv_lines[i]:
@@ -96,7 +94,6 @@ class snippetxCommand(sublime_plugin.TextCommand):
             for x in snippet_xmls
             if self.filterByScope(x, scope)
         ]
-
         return snippet_contents
 
     def run(self, edit):
@@ -106,7 +103,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
         data = self.getData(patterns)
 
         if (data['+metaRegion'].a >= 0 and data['+metaRegion'].b > 0):
-            scope   = self.view.scope_name(data['+metaRegion'].a).split(' ')
+            scope = self.view.scope_name(data['+metaRegion'].a).split(' ')
 
             snippets = self.getSnippet(data['snippetName'], scope)
 
@@ -114,9 +111,10 @@ class snippetxCommand(sublime_plugin.TextCommand):
                 self.view.replace(edit, data['+metaRegion'], '')
 
                 for snippet in snippets:
-                    snips = ''
-                    for fields in self.getFields(data['asLinesMassaged']):
-                        snips += self.zipSnip(snippet, fields, data['indent'])
+                    snips = '\n'.join(
+                        self.zipSnip(snippet, fields, data['indent'])
+                        for fields in self.getFields(data['asLinesMassaged'])
+                    )
                     self.view.insert(edit, data['+metaRegion'].a, snips)
             else:
                 sublime.status_message("Can't find snippet trigger by %s" % data['snippetName'])
