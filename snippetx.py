@@ -1,7 +1,4 @@
-import mmap
 import os
-import os.path
-import pprint
 import re
 import sublime
 import sublime_plugin
@@ -32,14 +29,15 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
     def findFiles(self, path, type=".sublime-snippet"):
 
+        # return cache if exist
         all_snippet_path = getattr(self, 'all_snippet_path', [])
         if all_snippet_path:
             return all_snippet_path
 
+        # ... or setting cache
         for root, dirs, files in os.walk(path):
             for file in files:
                 if file.endswith(type):
-                    # yield os.path.join(root, file)
                     all_snippet_path.append(os.path.join(root, file))
         setattr(self, 'all_snippet_path', all_snippet_path)
         return all_snippet_path
@@ -49,15 +47,6 @@ class snippetxCommand(sublime_plugin.TextCommand):
             xml_root = ET.parse(path)
             if xml_root.find('tabTrigger').text == trigger_name:
                 yield xml_root
-
-    def readFile(self, path):
-        f = open(path)
-        s = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)       
-        return s.read(s.size()).decode("utf-8")
-
-    def findSnippetContent(self, snippet):
-        return ET.fromstring(snippet).find('content').text
-        # return re.search(r'CDATA\[[\n\r]{0,2}(.*?)\]\]', snippet, re.DOTALL).group(1) if snippet else ''
 
     def zipSnip(self, snippet, content, indent=''):
         for idx, field in enumerate(content):
@@ -81,28 +70,23 @@ class snippetxCommand(sublime_plugin.TextCommand):
         scope_rmNeg = re.sub(r'- .*? ', '', scope_text)
         return self.checkScope(scope_rmNeg.split(', '), allowed)
 
-
     def getData(self, patterns):
 
         data = {}
+        data['+metaRegion']     = self.view.find(patterns, 0)
+        csv_lines = self.getMatch(self.view, patterns, 0).splitlines()
+        print("self.view: %s" % self.view)
 
-        data['+metaRegion']     = self.view.find(patterns['+metaRegion'], 0)
+        data['snippetName'] = ''
+        for i in [0, -1]:
+            if 'sx:' in csv_lines[i]:
+                data['snippetName'] = csv_lines.pop(i).split('sx:')[-1]
 
-        data['asString']        = self.getMatch(self.view, patterns['+metaRegion'], 0)
-
-        data['asLines']         = data['asString'].splitlines()
-
-        if (re.search(r'sx:', data['asLines'][0])):
-            data['snippetName']     = re.search(r'(?<=sx:).+', data['asLines'].pop(0)).group(0)
-        elif (re.search(r'sx:', data['asLines'][-1])):
-            data['snippetName']     = re.search(r'(?<=sx:).+', data['asLines'].pop(-1)).group(0)
-        else: data['snippetName'] = ''
-
-        data['indent']          = re.search(r'[\t ]*', data['asLines'][0]).group(0)
+        data['indent']          = re.findall(r'^[\t\s]*', csv_lines[0])[0]
 
         data['asLinesMassaged'] = [
-            re.sub(r'(^[\t ]*|["]*)*', '', content)
-            for content in data['asLines'] if content.strip()
+            re.sub(r'(^[\t\s]*|["]*)*', '', content)
+            for content in csv_lines if content.strip()
         ]
 
         return data
@@ -121,7 +105,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
     def run(self, edit):
 
-        patterns = {'+metaRegion': r"([\t ]*sx:.*[\n\r]*)(.+[\n\r]?)*|(?<=[\n\r])?(.+[\n\r])+([\t ]*sx:.+)" }
+        patterns = r"([\t ]*sx:.*[\n\r]*)(.+[\n\r]?)*|(?<=[\n\r])?(.+[\n\r])+([\t ]*sx:.+)"
 
         data = self.getData(patterns)
 
