@@ -87,7 +87,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
     def filterByScope(self, snippet_xml, allowed):
         scope_node = snippet_xml.find('scope')
-        if not scope_node:
+        if scope_node is None:
             return True
         scope_text = snippet_xml.find('scope').text
         scope_rmNeg = re.sub(r'- .*? ', '', scope_text)
