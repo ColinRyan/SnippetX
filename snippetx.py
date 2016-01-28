@@ -53,19 +53,18 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
     def xmlMatchTabTrigger(self, paths, trigger_name):
         for path in paths:
-            # try:
-            xml_root = ET.parse(path)
-            tabTrigger_node = xml_root.find('tabTrigger')
-            if tabTrigger_node is not None:
+            try:
+                xml_root = ET.parse(path)
+                tabTrigger_node = xml_root.find('tabTrigger')
                 if str(tabTrigger_node.text) == trigger_name:
-                    # print("xml_root.find('tabTrigger').text: "+ tabTrigger_node.text)
+                    print("trigger_name: %s" % trigger_name)
+                    print(str(tabTrigger_node.text))
+                    print(str(tabTrigger_node.text) == trigger_name)
                     yield xml_root
-            else:
-                print("no tabTrigger_node")
-            # except Exception as e:
-            #     print("e: %s" % e)
-            #     print("path: %s" % path)
-            #     continue
+            except Exception as e:
+                print("e: %s" % e)
+                # print("path: %s" % path)
+                continue
 
     def zipSnip(self, snippet, fields, indent=''):
         snippet = snippet.strip()
@@ -81,7 +80,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
     def checkScope(self, present, allowed):
         for scope in present:
             for allow in allowed:
-                if re.match(scope, allow):
+                if re.match(scope.strip(), allow):
                     return True
         return False
 
@@ -90,8 +89,9 @@ class snippetxCommand(sublime_plugin.TextCommand):
         if scope_node is None:
             return True
         scope_text = snippet_xml.find('scope').text
+        print("snippet_xml.find('scope').text: %s" % str(snippet_xml.find('scope').text))
         scope_rmNeg = re.sub(r'- .*? ', '', scope_text)
-        return self.checkScope(scope_rmNeg.split(', '), allowed)
+        return self.checkScope(scope_rmNeg.split(','), allowed)
 
     def getData(self, pattern):
         csv_lines = self.getMatch(pattern, 0).splitlines()
@@ -117,8 +117,7 @@ class snippetxCommand(sublime_plugin.TextCommand):
     def getSnippet(self, name=None, scope=['text.plain']):
         
         filenames = self.findFiles(sublime.packages_path())
-
-        snippet_xmls = self.xmlMatchTabTrigger(filenames, name)
+        snippet_xmls = self.xmlMatchTabTrigger(filenames, str(name))
         snippet_contents = [
             x.find('content').text
             for x in snippet_xmls
