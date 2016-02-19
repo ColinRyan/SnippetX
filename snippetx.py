@@ -25,30 +25,14 @@ class snippetxCommand(sublime_plugin.TextCommand):
             yield result_line
 
     def findFiles(self, path, type=".sublime-snippet"):
-
-        # return cache if exist
-        # all_snippet_path = getattr(self, 'all_snippet_path', [])
-        # if all_snippet_path:
-        #     return all_snippet_path
-
-        # ... or setting cache
         all_snippet_path = []
-        # paths = []
         for root, dirs, files in os.walk(path):
+            # skip some "hidden" directories like .git, .svn, and node_modules.
             if '/.' in root or '/node_modules' in root:
                 continue
-            # paths.append(root)
             for file_name in files:
                 if file_name.endswith(type):
                     all_snippet_path.append(os.path.join(root, file_name))
-                    # if 'handlebars' in file_name:
-                    #     xml_root = ET.parse(os.path.join(root, file_name))
-                    #     t = xml_root.find('tabTrigger').text
-                    #     if str(t) == 'linkto':
-                    #         print(file_name)
-                    #         print("t: %s" % t)
-        setattr(self, 'all_snippet_path', all_snippet_path)
-        # print("paths: %s" % paths)
         return all_snippet_path
 
     def xmlMatchTabTrigger(self, paths, trigger_name):
@@ -58,12 +42,9 @@ class snippetxCommand(sublime_plugin.TextCommand):
                 tabTrigger_node = xml_root.find('tabTrigger')
                 if str(tabTrigger_node.text) == trigger_name:
                     print("trigger_name: %s" % trigger_name)
-                    print(str(tabTrigger_node.text))
-                    print(str(tabTrigger_node.text) == trigger_name)
                     yield xml_root
             except Exception as e:
-                print("e: %s" % e)
-                # print("path: %s" % path)
+                print("xmlMatchTabTrigger got: {e} @ {path}".format(e=e, path=path,))
                 continue
 
     def zipSnip(self, snippet, fields, indent=''):
