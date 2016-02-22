@@ -1,159 +1,133 @@
-import sublime, sublime_plugin, re, os, os.path, mmap
+import os
+import re
+import sublime
+import sublime_plugin
+import xml.etree.ElementTree as ET
+
 
 class snippetxCommand(sublime_plugin.TextCommand):
 
+    def getFields(self, lines):
+        for line in lines:
+            # for escape comma feature START
+            result_line = []
+            while True:
+                r = re.search(r'[^\\](,)', line)
+                if r:
+                    field = line[:r.end()-1]
+                    field = field.replace('\\,', ',')
+                    result_line.append(field)
+                    line = line[r.end():]
+                else:
+                    result_line.append(line.replace('\\,', ','))
+                    break
+            # for escape comma feature END
+            yield result_line
 
-	def maybe(self, dict, key):
-		if key in dict:
-			return dict[key]
-		else:
-			return None
+    def findFiles(self, path, type=".sublime-snippet"):
+        all_snippet_path = []
+        for root, dirs, files in os.walk(path):
+            # skip some "hidden" directories like .git, .svn, and node_modules.
+            if '/.' in root or '/node_modules' in root:
+                continue
+            for file_name in files:
+                if file_name.endswith(type):
+                    all_snippet_path.append(os.path.join(root, file_name))
+        return all_snippet_path
 
-	def getFields(self, lines):
-		for line in lines:
-			yield line.split(",")
+    def xmlMatchTabTrigger(self, paths, trigger_name):
+        for path in paths:
+            try:
+                xml_root = ET.parse(path)
+                tabTrigger_node = xml_root.find('tabTrigger')
+                if str(tabTrigger_node.text) == trigger_name:
+                    print("trigger_name: %s" % trigger_name)
+                    yield xml_root
+            except Exception as e:
+                print("xmlMatchTabTrigger got: {e} @ {path}".format(e=e, path=path,))
+                continue
 
+    def zipSnip(self, snippet, fields, indent=''):
+        snippet = snippet.strip()
+        for idx, field in enumerate(fields):
+            snippet = re.sub(r'(?<!\\)\${{{0}:.*?}}|\${0}'.format(str(idx+1)), field, snippet)
+        snippet = re.sub(r'(?<!\\)\$\{\d+:(.+?)\}', '\\1', snippet)
+        snippet = re.sub(r'(?<!\\)\$\d+', '', snippet)
+        return indent + snippet
 
-	def notEmpty(self, line):
-		if line not in ['\n', '\r\n', '']:
-			return line
+    def getMatch(self, pattern, num):
+        return self.view.substr(self.view.find(pattern, num))
 
+    def checkScope(self, present, allowed):
+        for scope in present:
+            for allow in allowed:
+                if re.match(scope.strip(), allow):
+                    return True
+        return False
 
-	def findFiles(self, path, type=".sublime-snippet"):
-		for root, dirs, files in os.walk(path):
-			for file in files:
-				if file.endswith(type):
-					yield os.path.join(root, file)
+    def filterByScope(self, snippet_xml, allowed):
+        scope_node = snippet_xml.find('scope')
+        if scope_node is None:
+            return True
+        scope_text = snippet_xml.find('scope').text
+        print("snippet_xml.find('scope').text: %s" % str(snippet_xml.find('scope').text))
+        scope_rmNeg = re.sub(r'- .*? ', '', scope_text)
+        return self.checkScope(scope_rmNeg.split(','), allowed)
 
+    def getData(self, pattern):
+        csv_lines = self.getMatch(pattern, 0).splitlines()
 
-	def matchFile(self, path, pattern):
-		f = open(path)
-		s = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-		if s.find(pattern.encode('utf-8')) != -1:
-			return path
-		return None
+        assert csv_lines
+        print("csv_lines: %s" % csv_lines)
+        csv_lines = list(filter(lambda x: x.strip(), csv_lines))
+        snippet_name = ''
+        for i in [0, -1]:
+            if 'sx:' in csv_lines[i]:
+                snippet_name = csv_lines.pop(i).split('sx:')[-1]
 
-	def readFile(self, path):
-		f = open(path)
-		s = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)		
-		return s.read(s.size()).decode("utf-8")
+        return {
+            '+metaRegion': self.view.find(pattern, 0),
+            'snippetName': snippet_name,
+            'indent': re.findall(r'^[\t\s]*', csv_lines[0])[0],
+            'asLinesMassaged': [
+                re.sub(r'(^[\t\s]*|["]*)*', '', content)
+                for content in csv_lines if content.strip()
+            ],
+        }
 
-	def findSnippetContent(self, snippet):
-		return re.search(r'CDATA\[[\n\r]{0,2}(.*?)\]\]', snippet, re.DOTALL).group(1) if snippet else ''
+    def getSnippet(self, name=None, scope=['text.plain']):
+        
+        filenames = self.findFiles(sublime.packages_path())
+        snippet_xmls = self.xmlMatchTabTrigger(filenames, str(name))
+        snippet_contents = [
+            x.find('content').text
+            for x in snippet_xmls
+            if self.filterByScope(x, scope)
+        ]
+        return snippet_contents
 
+    def run(self, edit):
 
-	def zipSnip(self, snippet, content, indent=''):
-		for idx, field in enumerate(content):
-			snippet = re.sub(r'(?<!\\)\${{{0}:.*?}}|\${0}'.format(str(idx+1)) ,field, snippet)
-		snippet = re.sub(r'(?<!\\)\$\{\d+:(.+?)\}', '\\1', snippet)
-		snippet = re.sub(r'(?<!\\)\$\d+', '', snippet)
-		return indent + snippet
+        patterns = r"([\t ]*sx:.*[\n\r]*)(.+[\n\r]?)*|(?<=[\n\r])?(.+[\n\r])+([\t ]*sx:.+)"
 
+        data = self.getData(patterns)
 
-	def getMatch(self, view, pattern, num):
-		return view.substr(view.find(pattern, num))
+        if (data['+metaRegion'].a >= 0 and data['+metaRegion'].b > 0):
+            scope = self.view.scope_name(data['+metaRegion'].a).split(' ')
 
-	def getScope(self, snippet):
-		result = re.search(r'(?<!<!-- <scope>)((?<=<scope>).+?)(?=</scope>)', snippet)
-		if result is not None:
-			return result.group(0)
-		return None
+            snippets = self.getSnippet(data['snippetName'], scope)
 
-	def removeNegativeScope(self, scope):
-		return re.sub(r'- .*? ', '', scope)
+            if snippets:
+                self.view.replace(edit, data['+metaRegion'], '')
 
-	def checkScope(self, present, allowed):
-		for scope in present:
-			for allow in allowed:
-				if re.match(r'' + scope + r'', allow) is not None: return True
-		return False
+                for snippet in snippets:
+                    snips = '\n'.join(
+                        self.zipSnip(snippet, fields, data['indent'])
+                        for fields in self.getFields(data['asLinesMassaged'])
+                    )
+                    self.view.insert(edit, data['+metaRegion'].a, snips)
+            else:
+                sublime.status_message("Can't find snippet trigger by %s" % data['snippetName'])
 
-
-	def filterByScope(self, snippet, allowed):
-		scope = {}
-		scope['text'] = self.getScope(snippet)
-		print(scope)
-		if (scope['text'] is not None):
-			scope['rmNeg'] = self.removeNegativeScope(scope['text'])
-
-			if (self.checkScope(scope['rmNeg'].split(' '), allowed)):
-				return snippet
-			else:
-				return None
-
-		else: return snippet
-
-	def getData(self, patterns):
-
-		data = {}
-
-		data['+metaRegion']     = self.view.find(patterns['+metaRegion'], 0)
-
-		data['asString']        = self.getMatch(self.view, patterns['+metaRegion'], 0)
-
-		data['asLines']         = data['asString'].splitlines()
-
-		if (re.search(r'sx:', data['asLines'][0])):
-			data['snippetName']     = re.search(r'(?<=sx:).+', data['asLines'].pop(0)).group(0)
-		elif (re.search(r'sx:', data['asLines'][-1])):
-			data['snippetName']     = re.search(r'(?<=sx:).+', data['asLines'].pop(-1)).group(0)
-		else: data['snippetName'] = ''
-
-		data['indent']          = re.search(r'[\t ]*', data['asLines'][0]).group(0)
-
-		data['asLinesMassaged'] = [re.sub(r'(^[\t ]*|["]*)*', '', content) for content in list(filter(self.notEmpty, data['asLines']))]
-
-		return data
-
-
-	def getSnippet(self, name=None, scope=['text.plain']):
-
-		snippet = {}
-
-		snippet['scope']             = [re.sub(r'[\r\n ]*', '', x) for x in scope if x is not '']
-
-		snippet['name']              = name
-
-		snippet['match']             = '<tabTrigger>' + snippet['name'] + '</tabTrigger>'
-
-		snippet['filenames']         = list(self.findFiles(sublime.packages_path()))
-
-		snippet['matchedFilesByTab'] = [self.matchFile(x, snippet['match']) for x in snippet['filenames'] if x is not None]
-
-		snippet['text']              = [self.readFile(x) for x in snippet['matchedFilesByTab'] if x is not None]
-
-		snippet['filteredText']      = list(filter(None.__ne__, snippet['text']  ))		
-
-		snippet['filteredFilesByScope'] = [self.filterByScope(x, scope) for x in snippet['filteredText'] if x is not None]		
-
-
-		snippet['asString']         = [self.findSnippetContent(x) for x in snippet['filteredFilesByScope'] if x is not None]
-
-		snippet['asStringMassaged'] = [re.sub(r'[\r]', '', content) for content in snippet['asString']]
-
-		return snippet
-
-
-	def run(self, edit):
-
-		patterns = {'+metaRegion': r"([\t ]*sx:.*[\n\r]*)(.+[\n\r]?)*|(?<=[\n\r])?(.+[\n\r])+([\t ]*sx:.+)" }
-
-		data = self.getData(patterns)
-
-		if (data['+metaRegion'].a >= 0 and data['+metaRegion'].b > 0):
-			scope   = self.view.scope_name(data['+metaRegion'].a).split(' ')
-			print (self.view.scope_name(data['+metaRegion'].a).split(' '))
-			snippet = self.getSnippet(data['snippetName'], scope)
-			print(snippet)
-			if (len(snippet['asStringMassaged'])):
-				self.view.replace(edit, data['+metaRegion'], '')
-
-				for snippet in snippet['asStringMassaged']:
-					snips = ''
-					for fields in self.getFields(data['asLinesMassaged']):
-						snips += self.zipSnip(snippet,fields, data['indent'])
-					self.view.insert(edit, data['+metaRegion'].a, snips)
-			else:
-				sublime.status_message("Can't find snippet named " + snippet['name'])
-		else:
-			sublime.status_message("Can't find region.")
+        else:
+            sublime.status_message("Can't find region.")
