@@ -1,6 +1,6 @@
 <snippet>
 	<content><![CDATA[
-update table ${1:table} set $2 = $3 where $4 = $5
+update table ${1:default} set $2 = $3 where $4 = $5
 ]]></content>
 	<!-- Optional: Set a tabTrigger to define how to trigger the snippet -->
 	<tabTrigger>update</tabTrigger>

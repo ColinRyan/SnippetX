@@ -2,6 +2,7 @@ import os
 import re
 import sublime
 import sublime_plugin
+import zipfile
 import xml.etree.ElementTree as ET
 
 
@@ -9,19 +10,9 @@ class snippetxCommand(sublime_plugin.TextCommand):
 
     def getFields(self, lines):
         for line in lines:
-            # for escape comma feature START
-            result_line = []
-            while True:
-                r = re.search(r'[^\\](,)', line)
-                if r:
-                    field = line[:r.end()-1]
-                    field = field.replace('\\,', ',')
-                    result_line.append(field)
-                    line = line[r.end():]
-                else:
-                    result_line.append(line.replace('\\,', ','))
-                    break
-            # for escape comma feature END
+
+            result_line  = line.split(',')
+            print(result_line)
             yield result_line
 
     def findFiles(self, path, type=".sublime-snippet"):
@@ -47,11 +38,27 @@ class snippetxCommand(sublime_plugin.TextCommand):
                 print("xmlMatchTabTrigger got: {e} @ {path}".format(e=e, path=path,))
                 continue
 
+    def xmlMatchTabTriggerFromString(self, content, trigger_name):
+        for text in content:
+            try:
+                xml_root = ET.fromstring(text)
+                tabTrigger_node = xml_root.find('tabTrigger')
+                if str(tabTrigger_node.text) == trigger_name:
+                    print("trigger_name: %s" % trigger_name)
+                    yield xml_root
+            except Exception as e:
+                print("xmlMatchTabTriggerFromString got: {e} @ {text}".format(e=e, text=text,))
+                continue
+
     def zipSnip(self, snippet, fields, indent=''):
         snippet = snippet.strip()
+        print(indent)
         for idx, field in enumerate(fields):
-            snippet = re.sub(r'(?<!\\)\${{{0}:.*?}}|\${0}'.format(str(idx+1)), field, snippet)
-        snippet = re.sub(r'(?<!\\)\$\{\d+:(.+?)\}', '\\1', snippet)
+            if field.strip() in ['', 'null', 'NULL']:
+                snippet = re.sub(r'(?<!\\)\$\{\d+:(.+?)\}', '\\1', snippet)
+            else: 
+                snippet = re.sub(r'(?<!\\)\${{{0}:.*?}}|\${0}'.format(str(idx+1)), field, snippet)
+
         snippet = re.sub(r'(?<!\\)\$\d+', '', snippet)
         return indent + snippet
 
@@ -77,17 +84,19 @@ class snippetxCommand(sublime_plugin.TextCommand):
     def getData(self, pattern):
         csv_lines = self.getMatch(pattern, 0).splitlines()
 
+
         assert csv_lines
         print("csv_lines: %s" % csv_lines)
         csv_lines = list(filter(lambda x: x.strip(), csv_lines))
         snippet_name = ''
         for i in [0, -1]:
             if 'sx:' in csv_lines[i]:
-                snippet_name = csv_lines.pop(i).split('sx:')[-1]
+                prefix, snippet_name, *snippet_scope = csv_lines.pop(i).split(':')
 
         return {
             '+metaRegion': self.view.find(pattern, 0),
             'snippetName': snippet_name,
+            'snippetScope': snippet_scope,
             'indent': re.findall(r'^[\t\s]*', csv_lines[0])[0],
             'asLinesMassaged': [
                 re.sub(r'(^[\t\s]*|["]*)*', '', content)
@@ -95,16 +104,36 @@ class snippetxCommand(sublime_plugin.TextCommand):
             ],
         }
 
+    #def getSnippetFromSublimePackage(self, name=None, scope=['text.plain']):
     def getSnippet(self, name=None, scope=['text.plain']):
         
-        filenames = self.findFiles(sublime.packages_path())
-        snippet_xmls = self.xmlMatchTabTrigger(filenames, str(name))
-        snippet_contents = [
+        snippetFilenames = self.findFiles(sublime.packages_path())
+
+        sublime_package_filenames = self.findFiles(sublime.packages_path() + "\\..", ".sublime-package")
+
+        content = []
+        for sp in sublime_package_filenames:
+            file = zipfile.ZipFile(sp)
+            content.append( [file.open(name).read() for name in file.namelist() if name.endswith(".sublime-snippet") ])
+
+        content = [item for sublist in content for item in sublist]
+
+        tex = self.xmlMatchTabTriggerFromString(content, str(name))
+        package_snippet_contents =[
+            x.find('content').text
+            for x in tex
+            if self.filterByScope(x, scope)
+        ]
+
+        snippet_xmls = self.xmlMatchTabTrigger(snippetFilenames, str(name))
+
+        custom_snippet_contents = [
             x.find('content').text
             for x in snippet_xmls
             if self.filterByScope(x, scope)
         ]
-        return snippet_contents
+        return custom_snippet_contents + package_snippet_contents
+
 
     def run(self, edit):
 
@@ -113,7 +142,11 @@ class snippetxCommand(sublime_plugin.TextCommand):
         data = self.getData(patterns)
 
         if (data['+metaRegion'].a >= 0 and data['+metaRegion'].b > 0):
-            scope = self.view.scope_name(data['+metaRegion'].a).split(' ')
+            scope = ['text.plain']
+            if (len(data['snippetScope']) > 0):
+                scope = data['snippetScope']
+            else:
+                scope = self.view.scope_name(data['+metaRegion'].a).split(' ')
 
             snippets = self.getSnippet(data['snippetName'], scope)
 
